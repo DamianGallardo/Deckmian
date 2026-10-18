@@ -7,15 +7,25 @@ Deckmian is a personal notch app for macOS. It turns the MacBook notch into an i
 ## Quick path
 
 1. Install Xcode (macOS 14 SDK or later) and accept its license.
-2. Build:
+2. Create the local signing identity (once per Mac), then trust it for code signing:
+
+   ```bash
+   ./Configuration/signing/create-local-signing-cert.sh ~/.deckmian-signing
+   security add-trusted-cert -r trustRoot -p codeSign -k ~/Library/Keychains/login.keychain-db ~/.deckmian-signing/cert.pem
+   ```
+
+   A stable signature keeps macOS permissions (Accessibility, Screen Recording, Calendar…) across rebuilds. Ad-hoc builds lose them every time.
+
+3. Build:
 
    ```bash
    xcodebuild -project Deckmian.xcodeproj -scheme Deckmian -configuration Debug \
-     -destination 'platform=macOS' -derivedDataPath ../DerivedData \
-     CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= build
+     -destination 'platform=macOS' -derivedDataPath ../DerivedData build
    ```
 
-3. Open `../DerivedData/Build/Products/Debug/Deckmian.app` and hover over the notch.
+   If macOS asks for keychain access for `codesign`, enter your login password and choose **Always Allow**.
+
+4. Open `../DerivedData/Build/Products/Debug/Deckmian.app` and hover over the notch.
 
 > Quit Deckmian before rebuilding. macOS kills a running app when its binary is replaced.
 
