@@ -17,8 +17,9 @@ private final class FloatingVideoPanel: NSPanel {
 
 /// A movable, resizable floating window showing the live Chrome video.
 ///
-/// Drag anywhere to move, drag edges or corners to resize (the aspect ratio is locked to the
-/// video), double-click to enlarge. Hover shows "Back to notch", "Enlarge" and close.
+/// Drag anywhere to move (drop it on the notch to send the video back), drag edges or corners to
+/// resize (the aspect ratio is locked to the video), double-click to enlarge. Hover shows
+/// "Back to notch", "Enlarge" and close.
 @MainActor
 final class FloatingVideoWindowController: NSObject, NSWindowDelegate {
     static let shared = FloatingVideoWindowController()
@@ -34,7 +35,20 @@ final class FloatingVideoWindowController: NSObject, NSWindowDelegate {
     private var frameBeforeEnlarge: NSRect?
     private var isAnimatingFrame = false
 
+    /// Mouse-following drag (moving the panel, or a drag out of the notch).
+    private var dragTimer: Timer?
+    /// Cursor position relative to the panel's origin, as a fraction of its size.
+    private var dragAnchor = CGPoint(x: 0.5, y: 0.5)
+    private var dragBaseSize: NSSize = .zero
+    private var isOverDropZone = false
+
     private var isEnlarged: Bool { frameBeforeEnlarge != nil }
+    private var isDragging: Bool { dragTimer != nil }
+
+    private static let dropZoneScale: CGFloat = 0.8
+    private static let dropZoneAlpha: CGFloat = 0.6
+    /// Area around the top center of a screen where dropping the panel returns it to the notch.
+    private static let dropZoneSize = NSSize(width: 360, height: 90)
 
     func show() {
         if let panel {
@@ -52,8 +66,29 @@ final class FloatingVideoWindowController: NSObject, NSWindowDelegate {
         }
     }
 
+    /// Shows the panel centered under the cursor and keeps it there until the mouse is released.
+    func showFollowingMouse() {
+        let isNew = panel == nil
+        if isNew { createPanel() }
+        guard let panel else { return }
+
+        let mouse = NSEvent.mouseLocation
+        let size = panel.frame.size
+        panel.setFrame(
+            NSRect(x: mouse.x - size.width / 2, y: mouse.y - size.height / 2, width: size.width, height: size.height),
+            display: true
+        )
+        if isNew {
+            LiveVideoCapture.shared.acquire(.floatingWindow)
+            panel.alphaValue = 1
+        }
+        panel.orderFrontRegardless()
+        beginMouseDrag(anchor: CGPoint(x: 0.5, y: 0.5))
+    }
+
     func close() {
         guard let panel else { return }
+        stopDragTimer()
         self.panel = nil
         container = nil
         cancellables.removeAll()
@@ -76,14 +111,17 @@ final class FloatingVideoWindowController: NSObject, NSWindowDelegate {
 
         let panel = FloatingVideoPanel(
             contentRect: frame,
-            styleMask: [.borderless, .resizable, .nonactivatingPanel],
+            // Resizing is done by the container's edge handles: borderless panels show no
+            // native resize cursors.
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
         panel.isFloatingPanel = true
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.isMovableByWindowBackground = true
+        // Moving is handled by `beginMouseDrag` so the drop-on-notch hint can follow the cursor.
+        panel.isMovableByWindowBackground = false
         panel.hidesOnDeactivate = false
         panel.backgroundColor = .clear
         panel.isOpaque = false
@@ -95,6 +133,11 @@ final class FloatingVideoWindowController: NSObject, NSWindowDelegate {
         let container = FloatingVideoContainerView(frame: NSRect(origin: .zero, size: frame.size))
         container.onBackToNotch = { LiveVideoCapture.shared.returnToNotch() }
         container.onToggleEnlarge = { [weak self] in self?.toggleEnlarge() }
+        container.onBeginMove = { [weak self] anchor in self?.beginMouseDrag(anchor: anchor) }
+        container.onResize = { [weak self] startFrame, edges, delta in
+            self?.resize(from: startFrame, edges: edges, delta: delta)
+        }
+        container.onEndResize = { [weak self] in self?.endResize() }
         panel.contentView = container
 
         self.panel = panel
@@ -155,17 +198,145 @@ final class FloatingVideoWindowController: NSObject, NSWindowDelegate {
         if !isEnlarged { saveFrame() }
     }
 
-    // MARK: - Frame persistence
+    // MARK: - Moving and drag back to the notch
 
-    func windowDidMove(_ notification: Notification) {
+    /// Moves the panel with the cursor until the left mouse button is released.
+    ///
+    /// Polls the global mouse state instead of relying on mouse-dragged events, so it also works
+    /// when the drag started in the notch window (which keeps receiving those events).
+    /// - Parameter anchor: cursor position inside the panel, as a fraction of its size.
+    private func beginMouseDrag(anchor: CGPoint) {
+        guard let panel else { return }
+        stopDragTimer()
+        dragAnchor = anchor
+        dragBaseSize = panel.frame.size
+        isOverDropZone = false
+
+        // Scheduled on the main run loop, so the callback runs on the main thread.
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { _ in
+            MainActor.assumeIsolated { FloatingVideoWindowController.shared.dragTick() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        dragTimer = timer
+    }
+
+    private func dragTick() {
+        guard let panel else {
+            stopDragTimer()
+            return
+        }
+        guard NSEvent.pressedMouseButtons & 1 != 0 else {
+            endMouseDrag()
+            return
+        }
+
+        let mouse = NSEvent.mouseLocation
+        let overDropZone = Self.dropZone(containing: mouse) != nil
+        if overDropZone != isOverDropZone {
+            isOverDropZone = overDropZone
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.15
+                panel.animator().alphaValue = overDropZone ? Self.dropZoneAlpha : 1
+            }
+        }
+
+        let scale = overDropZone ? Self.dropZoneScale : 1
+        let size = NSSize(width: dragBaseSize.width * scale, height: dragBaseSize.height * scale)
+        let origin = NSPoint(x: mouse.x - size.width * dragAnchor.x, y: mouse.y - size.height * dragAnchor.y)
+        panel.setFrame(NSRect(origin: origin, size: size), display: true)
+    }
+
+    private func endMouseDrag() {
+        stopDragTimer()
+        guard let panel else { return }
+
+        if isOverDropZone {
+            isOverDropZone = false
+            panel.setFrame(NSRect(origin: panel.frame.origin, size: dragBaseSize), display: false)
+            LiveVideoCapture.shared.returnToNotch()
+            return
+        }
+
+        panel.alphaValue = 1
+        let target = clamped(panel.frame, to: nil)
+        if target != panel.frame {
+            isAnimatingFrame = true
+            panel.setFrame(target, display: true, animate: true)
+            isAnimatingFrame = false
+        }
         saveFrame()
     }
 
-    func windowDidEndLiveResize(_ notification: Notification) {
+    private func stopDragTimer() {
+        dragTimer?.invalidate()
+        dragTimer = nil
+    }
+
+    /// The notch drop area of the screen under `point`: the top center, around the notch.
+    private static func dropZone(containing point: NSPoint) -> NSRect? {
+        guard let screen = NSScreen.screens.first(where: { NSMouseInRect(point, $0.frame, false) }) else { return nil }
+        let frame = screen.frame
+        let zone = NSRect(
+            x: frame.midX - dropZoneSize.width / 2,
+            y: frame.maxY - dropZoneSize.height,
+            width: dropZoneSize.width,
+            height: dropZoneSize.height
+        )
+        return NSMouseInRect(point, zone, false) ? zone : nil
+    }
+
+    // MARK: - Resizing
+
+    /// Resizes from an edge or corner drag, keeping the video's aspect ratio. The opposite edge
+    /// (or corner) stays put; a single edge keeps the other axis centered.
+    private func resize(from startFrame: NSRect, edges: ResizeEdges, delta: CGVector) {
+        guard let panel else { return }
+        let ratio = startFrame.width / max(startFrame.height, 1)
+
+        var width = startFrame.width
+        if edges.contains(.right) { width += delta.dx }
+        if edges.contains(.left) { width -= delta.dx }
+        var height = startFrame.height
+        if edges.contains(.top) { height += delta.dy }
+        if edges.contains(.bottom) { height -= delta.dy }
+
+        // Follow whichever axis the user moved more.
+        let horizontal = edges.contains(.left) || edges.contains(.right)
+        let vertical = edges.contains(.top) || edges.contains(.bottom)
+        if vertical && (!horizontal || abs(height - startFrame.height) * ratio > abs(width - startFrame.width)) {
+            width = height * ratio
+        }
+
+        let visible = (panel.screen ?? NSScreen.main)?.visibleFrame.size ?? NSSize(width: 4000, height: 4000)
+        let maxWidth = min(visible.width, visible.height * ratio)
+        width = min(max(width, Self.minimumWidth), maxWidth)
+        height = width / ratio
+
+        var origin = startFrame.origin
+        if edges.contains(.left) {
+            origin.x = startFrame.maxX - width
+        } else if !horizontal {
+            origin.x = startFrame.midX - width / 2
+        }
+        if edges.contains(.bottom) {
+            origin.y = startFrame.maxY - height
+        } else if !vertical {
+            origin.y = startFrame.midY - height / 2
+        }
+        panel.setFrame(NSRect(origin: origin, size: NSSize(width: width, height: height)), display: true)
+    }
+
+    private func endResize() {
         // A manual resize while enlarged becomes the new normal size.
         frameBeforeEnlarge = nil
         container?.isEnlarged = false
         panel?.invalidateShadow()
+        saveFrame()
+    }
+
+    // MARK: - Frame persistence
+
+    func windowDidMove(_ notification: Notification) {
         saveFrame()
     }
 
@@ -174,7 +345,7 @@ final class FloatingVideoWindowController: NSObject, NSWindowDelegate {
     }
 
     private func saveFrame() {
-        guard let panel, !isEnlarged, !isAnimatingFrame else { return }
+        guard let panel, !isEnlarged, !isAnimatingFrame, !isDragging else { return }
         Defaults[.floatingVideoFrame] = NSStringFromRect(panel.frame)
     }
 
@@ -220,10 +391,98 @@ final class FloatingVideoWindowController: NSObject, NSWindowDelegate {
 
 // MARK: - Content
 
-/// Root view of the floating window: video, hover controls and an "unavailable" label.
+/// Window edges grabbed by a resize handle.
+fileprivate struct ResizeEdges: OptionSet {
+    let rawValue: Int
+    static let left = ResizeEdges(rawValue: 1 << 0)
+    static let right = ResizeEdges(rawValue: 1 << 1)
+    static let top = ResizeEdges(rawValue: 1 << 2)
+    static let bottom = ResizeEdges(rawValue: 1 << 3)
+}
+
+/// Invisible strip along an edge or corner of the floating window that resizes it when dragged.
+private final class ResizeHandleView: NSView {
+    let edges: ResizeEdges
+    var onResize: ((NSRect, ResizeEdges, CGVector) -> Void)?
+    var onEnd: (() -> Void)?
+    private var hoverArea: NSTrackingArea?
+
+    init(edges: ResizeEdges) {
+        self.edges = edges
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    private var cursor: NSCursor {
+        if #available(macOS 15.0, *) {
+            let position: NSCursor.FrameResizePosition
+            switch edges {
+            case [.top, .left]: position = .topLeft
+            case [.top, .right]: position = .topRight
+            case [.bottom, .left]: position = .bottomLeft
+            case [.bottom, .right]: position = .bottomRight
+            case .left: position = .left
+            case .right: position = .right
+            case .top: position = .top
+            default: position = .bottom
+            }
+            return NSCursor.frameResize(position: position, directions: .all)
+        }
+        if edges == .left || edges == .right { return .resizeLeftRight }
+        if edges == .top || edges == .bottom { return .resizeUpDown }
+        return .crosshair
+    }
+
+    // The panel never becomes key, so cursor rects would not apply; set the cursor on hover.
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverArea { removeTrackingArea(hoverArea) }
+        let area = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        hoverArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) { cursor.set() }
+    override func mouseMoved(with event: NSEvent) { cursor.set() }
+    override func mouseExited(with event: NSEvent) { NSCursor.arrow.set() }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let window else { return }
+        let startFrame = window.frame
+        let startMouse = NSEvent.mouseLocation
+        cursor.set()
+        while let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
+            if next.type == .leftMouseUp { break }
+            let mouse = NSEvent.mouseLocation
+            onResize?(startFrame, edges, CGVector(dx: mouse.x - startMouse.x, dy: mouse.y - startMouse.y))
+        }
+        onEnd?()
+    }
+}
+
+/// Root view of the floating window: video, resize handles, hover controls and an
+/// "unavailable" label.
 private final class FloatingVideoContainerView: NSView {
     var onBackToNotch: (() -> Void)?
     var onToggleEnlarge: (() -> Void)?
+    /// Starts moving the window; the point is the cursor position as a fraction of the size.
+    var onBeginMove: ((CGPoint) -> Void)?
+    var onResize: ((NSRect, ResizeEdges, CGVector) -> Void)?
+    var onEndResize: (() -> Void)?
+
+    private static let edgeThickness: CGFloat = 6
+    private static let cornerSize: CGFloat = 16
+    private var handles: [ResizeHandleView] = []
 
     var isEnlarged = false {
         didSet { updateEnlargeButton() }
@@ -251,6 +510,17 @@ private final class FloatingVideoContainerView: NSView {
         videoView.frame = bounds
         videoView.autoresizingMask = [.width, .height]
         addSubview(videoView)
+
+        let allEdges: [ResizeEdges] = [
+            .left, .right, .top, .bottom, [.top, .left], [.top, .right], [.bottom, .left], [.bottom, .right],
+        ]
+        for edges in allEdges {
+            let handle = ResizeHandleView(edges: edges)
+            handle.onResize = { [weak self] startFrame, edges, delta in self?.onResize?(startFrame, edges, delta) }
+            handle.onEnd = { [weak self] in self?.onEndResize?() }
+            addSubview(handle)
+            handles.append(handle)
+        }
 
         unavailableLabel.textColor = NSColor.white.withAlphaComponent(0.6)
         unavailableLabel.font = .systemFont(ofSize: 13, weight: .medium)
@@ -288,15 +558,40 @@ private final class FloatingVideoContainerView: NSView {
 
     // MARK: Mouse
 
-    override var mouseDownCanMoveWindow: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { false }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func mouseDown(with event: NSEvent) {
         if event.clickCount == 2 {
             onToggleEnlarge?()
-        } else {
-            window?.performDrag(with: event)
+            return
+        }
+        let point = convert(event.locationInWindow, from: nil)
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        onBeginMove?(CGPoint(x: point.x / bounds.width, y: point.y / bounds.height))
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        let edge = Self.edgeThickness, corner = Self.cornerSize
+        let w = bounds.width, h = bounds.height
+        for handle in handles {
+            switch handle.edges {
+            case .left: handle.frame = NSRect(x: 0, y: corner, width: edge, height: h - 2 * corner)
+            case .right: handle.frame = NSRect(x: w - edge, y: corner, width: edge, height: h - 2 * corner)
+            case .bottom: handle.frame = NSRect(x: corner, y: 0, width: w - 2 * corner, height: edge)
+            case .top: handle.frame = NSRect(x: corner, y: h - edge, width: w - 2 * corner, height: edge)
+            case [.bottom, .left]: handle.frame = NSRect(x: 0, y: 0, width: corner, height: corner)
+            case [.bottom, .right]: handle.frame = NSRect(x: w - corner, y: 0, width: corner, height: corner)
+            case [.top, .left]: handle.frame = NSRect(x: 0, y: h - corner, width: corner, height: corner)
+            default: handle.frame = NSRect(x: w - corner, y: h - corner, width: corner, height: corner)
+            }
         }
     }
 

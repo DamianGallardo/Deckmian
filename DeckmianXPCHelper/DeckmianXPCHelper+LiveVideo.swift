@@ -7,6 +7,8 @@
 
 import AppKit
 import ApplicationServices
+import os
+import Darwin
 
 // MARK: - Live video
 
@@ -26,6 +28,7 @@ extension DeckmianXPCHelper {
 private func _AXUIElementGetWindow(_ element: AXUIElement, _ windowID: UnsafeMutablePointer<CGWindowID>) -> AXError
 
 enum ChromeVideoAXLocator {
+    static let log = Logger(subsystem: "com.deckmian.live-video", category: "helper")
     static let queue = DispatchQueue(label: "com.deckmian.helper.liveVideo", qos: .userInitiated)
 
     private static let chromeBundleIdentifier = "com.google.Chrome"
@@ -71,18 +74,24 @@ enum ChromeVideoAXLocator {
     // MARK: Entry point
 
     static func locate(preferredTitle: String) -> [String: String] {
-        guard AXIsProcessTrusted() else { return status(ChromeVideoKeys.statusNotTrusted) }
-        guard let chrome = NSRunningApplication.runningApplications(withBundleIdentifier: chromeBundleIdentifier)
-            .first(where: { !$0.isTerminated })
-        else { return status(ChromeVideoKeys.statusChromeNotRunning) }
+        guard AXIsProcessTrusted() else {
+            log.notice("locate: helper is not trusted for Accessibility")
+            return status(ChromeVideoKeys.statusNotTrusted)
+        }
+        guard let chromePID = chromeProcessIdentifier() else {
+            log.notice("locate: Chrome process not found")
+            return status(ChromeVideoKeys.statusChromeNotRunning)
+        }
 
-        let app = AXUIElementCreateApplication(chrome.processIdentifier)
+        let app = AXUIElementCreateApplication(chromePID)
         AXUIElementSetMessagingTimeout(app, 0.3)
-        enableWebAccessibility(app, pid: chrome.processIdentifier)
+        enableWebAccessibility(app, pid: chromePID)
 
         guard let windows = copyValue(app, kAXWindowsAttribute) as? [AXUIElement], !windows.isEmpty else {
+            log.notice("locate: Chrome exposes no AX windows")
             return status(ChromeVideoKeys.statusNotFound)
         }
+        log.notice("locate: \(windows.count, privacy: .public) Chrome windows, title hint '\(preferredTitle, privacy: .public)'")
 
         let title = preferredTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         // Search the window showing the current song first, then front to back.
@@ -112,8 +121,11 @@ enum ChromeVideoAXLocator {
         }
 
         guard let best = matches.max(by: { score($0, title) < score($1, title) }) else {
+            log.notice("locate: no video match in any window")
+            if let first = ordered.first { logSample(of: first) }
             return status(ChromeVideoKeys.statusNotFound)
         }
+        log.notice("locate: found kind=\(best.match.kind.rawValue, privacy: .public) frame=\(NSStringFromRect(best.match.visibleFrame), privacy: .public) window=\(best.windowID, privacy: .public)")
 
         let video = best.match.visibleFrame
         return [
@@ -282,5 +294,67 @@ enum ChromeVideoAXLocator {
               AXValueGetValue(size as! AXValue, .cgSize, &extent)
         else { return nil }
         return CGRect(origin: point, size: extent)
+    }
+}
+
+
+extension ChromeVideoAXLocator {
+    /// Diagnostics: logs a sample of the AX tree so a missed video can be matched by hand.
+    fileprivate static func logSample(of window: AXUIElement) {
+        var queue: [(AXUIElement, Int)] = [(window, 0)]
+        var seen = Set<String>()
+        var visited = 0
+        while !queue.isEmpty, visited < 1500, seen.count < 60 {
+            let (element, depth) = queue.removeFirst()
+            visited += 1
+            let role = sampleValue(element, kAXRoleAttribute) as? String ?? ""
+            let description = sampleValue(element, kAXRoleDescriptionAttribute) as? String ?? ""
+            let classes = (sampleValue(element, "AXDOMClassList") as? [String])?.joined(separator: ".") ?? ""
+            let identifier = sampleValue(element, "AXDOMIdentifier") as? String ?? ""
+            let key = "\(role)|\(description)|\(identifier)|\(classes.prefix(60))"
+            if role != "AXStaticText", seen.insert(key).inserted {
+                log.notice("sample d\(depth, privacy: .public): \(key, privacy: .public)")
+            }
+            if depth < 40, let children = sampleValue(element, kAXChildrenAttribute) as? [AXUIElement] {
+                queue.append(contentsOf: children.map { ($0, depth + 1) })
+            }
+        }
+        log.notice("sample: visited \(visited, privacy: .public) nodes")
+    }
+
+    private static func sampleValue(_ element: AXUIElement, _ attribute: String) -> AnyObject? {
+        var value: AnyObject?
+        return AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success ? value : nil
+    }
+}
+
+
+extension ChromeVideoAXLocator {
+    /// Chrome's main process. XPC services may not see LaunchServices' running-app list, so fall
+    /// back to scanning the process table for Chrome's main executable.
+    fileprivate static func chromeProcessIdentifier() -> pid_t? {
+        if let app = NSRunningApplication.runningApplications(withBundleIdentifier: chromeBundleIdentifier)
+            .first(where: { !$0.isTerminated }) {
+            return app.processIdentifier
+        }
+
+        // Chrome may run from a code-sign clone (".../Google Chrome.app.bundle/..."), so match the
+        // main executable by name inside a bundle rather than by its install path.
+        let mainExecutableSuffix = "/Contents/MacOS/Google Chrome"
+        let count = proc_listallpids(nil, 0)
+        guard count > 0 else { return nil }
+        var pids = [pid_t](repeating: 0, count: Int(count) * 2)
+        let filled = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
+        guard filled > 0 else { return nil }
+
+        var path = [CChar](repeating: 0, count: Int(MAXPATHLEN) * 4)
+        for pid in pids.prefix(Int(filled)) where pid > 0 {
+            guard proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { continue }
+            let executablePath = String(cString: path)
+            if executablePath.hasSuffix(mainExecutableSuffix), executablePath.contains("Google Chrome.app") {
+                return pid
+            }
+        }
+        return nil
     }
 }

@@ -29,7 +29,12 @@ struct AlbumArtView: View {
     @ObservedObject var vm: BoringViewModel
     @ObservedObject var liveVideo = LiveVideoCapture.shared
     @State private var isHoveringArtwork = false
+    /// Set once a drag on the live video has popped it out, until that drag ends.
+    @State private var didDragOut = false
     let albumArtNamespace: Namespace.ID
+
+    /// Distance a drag on the live video must travel before it pops the video out.
+    private static let dragOutDistance: CGFloat = 40
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -43,6 +48,26 @@ struct AlbumArtView: View {
         }
         .onHover { isHoveringArtwork = $0 }
         .liveVideoConsumer(.notchSlot, isActive: vm.notchState == .open)
+        .onChange(of: liveVideo.isPoppedOut) { _, poppedOut in
+            if !poppedOut { didDragOut = false }
+        }
+    }
+
+    /// Dragging the live video out of the slot turns it into the floating window, which then
+    /// follows the cursor until release. Short drags and clicks keep the artwork's behavior.
+    private var dragOutGesture: some Gesture {
+        DragGesture(minimumDistance: 6, coordinateSpace: .global)
+            .onChanged { value in
+                guard !didDragOut, showsLiveVideo else { return }
+                let distance = hypot(value.translation.width, value.translation.height)
+                if distance > Self.dragOutDistance {
+                    didDragOut = true
+                    liveVideo.popOutByDragging()
+                }
+            }
+            .onEnded { _ in
+                didDragOut = false
+            }
     }
 
     /// The live Chrome video replaces the artwork while it streams and is not popped out.
@@ -78,6 +103,8 @@ struct AlbumArtView: View {
                 }
             }
             .buttonStyle(PlainButtonStyle())
+            // Only while the live video shows, so the plain artwork keeps its gestures untouched.
+            .highPriorityGesture(dragOutGesture, including: showsLiveVideo ? .all : .subviews)
             .scaleEffect(musicManager.isPlaying ? 1 : 0.85)
             
             albumArtDarkOverlay

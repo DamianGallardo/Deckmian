@@ -8,6 +8,7 @@
 import AppKit
 import CoreServices
 import Foundation
+import os
 
 /// The video found in the active tab of a Chrome window.
 struct BrowserVideoTarget: Equatable, Sendable {
@@ -53,6 +54,7 @@ enum BrowserVideoLocation: Equatable, Sendable {
 /// (it never triggers the Automation prompt) and only if Chrome happens to allow JavaScript from
 /// Apple Events. Its failures are never surfaced.
 enum BrowserVideoLocator {
+    private static let log = Logger(subsystem: "com.deckmian.live-video", category: "locator")
     static let chromeBundleIdentifier = "com.google.Chrome"
 
     private static let queue = DispatchQueue(label: "com.deckmian.liveVideo.locator", qos: .userInitiated)
@@ -64,7 +66,10 @@ enum BrowserVideoLocator {
     /// - Parameter preferredTitle: the current song title, used to pick between several windows.
     static func locate(preferredTitle: String?) async -> BrowserVideoLocation {
         // Never address Chrome when it is not running: `tell application` would launch it.
-        guard isChromeRunning else { return .chromeNotRunning }
+        guard isChromeRunning else {
+            log.notice("locate: NSRunningApplication does not list Chrome in the app")
+            return .chromeNotRunning
+        }
 
         let title = preferredTitle ?? ""
         if let reply = await XPCHelperClient.shared.locateChromeVideo(preferredTitle: title) {
@@ -74,6 +79,7 @@ enum BrowserVideoLocator {
             case ChromeVideoKeys.statusNotTrusted:
                 return .needsAccessibility
             case ChromeVideoKeys.statusChromeNotRunning:
+                log.notice("locate: helper reports Chrome not running")
                 return .chromeNotRunning
             default:
                 break

@@ -10,6 +10,7 @@ import Combine
 import CoreMedia
 import Defaults
 import ScreenCaptureKit
+import os
 
 /// Streams the video playing in Google Chrome so it can replace the music artwork.
 ///
@@ -80,6 +81,7 @@ final class LiveVideoCapture: ObservableObject {
     private var retryAfter: Date = .distantPast
     private var lastTarget: BrowserVideoTarget?
 
+    private static let log = Logger(subsystem: "com.deckmian.live-video", category: "capture")
     private static let pollInterval: Duration = .milliseconds(750)
     private static let maxOutputWidth: CGFloat = 1280
     private static let retryDelay: TimeInterval = 3
@@ -95,6 +97,7 @@ final class LiveVideoCapture: ObservableObject {
         )
         .receive(on: RunLoop.main)
         .sink { [weak self] bundleIdentifier, enabled in
+            Self.log.notice("source=\(bundleIdentifier ?? "nil", privacy: .public) enabled=\(enabled, privacy: .public)")
             self?.updateEligibility(enabled && bundleIdentifier == BrowserVideoLocator.chromeBundleIdentifier)
         }
         .store(in: &cancellables)
@@ -119,6 +122,14 @@ final class LiveVideoCapture: ObservableObject {
         guard isEligible, !isPoppedOut else { return }
         isPoppedOut = true
         FloatingVideoWindowController.shared.show()
+    }
+
+    /// Pops the video out from a drag that left the artwork slot: the floating window appears
+    /// under the cursor and follows it until the mouse button is released.
+    func popOutByDragging() {
+        guard isEligible, state == .streaming, !isPoppedOut else { return }
+        isPoppedOut = true
+        FloatingVideoWindowController.shared.showFollowingMouse()
     }
 
     /// Closes the floating window and shows the video in the notch again.
@@ -256,6 +267,18 @@ final class LiveVideoCapture: ObservableObject {
         isEligible = eligible
         if !eligible { returnToNotch() }
         reconcile()
+        if eligible { prewarmLocator() }
+    }
+
+    /// One lookup as soon as Chrome becomes the media source, so Chrome builds its Accessibility
+    /// tree before the notch opens and the first real lookup finds the video right away.
+    private func prewarmLocator() {
+        guard !shouldRun else { return }
+        let title = MusicManager.shared.songTitle
+        Task {
+            let location = await BrowserVideoLocator.locate(preferredTitle: title)
+            Self.log.notice("prewarm: \(String(describing: location), privacy: .public)")
+        }
     }
 
     private var shouldRun: Bool {
@@ -263,6 +286,7 @@ final class LiveVideoCapture: ObservableObject {
     }
 
     private func reconcile() {
+        Self.log.notice("reconcile: eligible=\(self.isEligible, privacy: .public) consumers=\(self.consumers.count, privacy: .public)")
         if shouldRun {
             guard pollTask == nil else { return }
             pollTask = Task { [weak self] in
@@ -284,6 +308,7 @@ final class LiveVideoCapture: ObservableObject {
 
         let location = await BrowserVideoLocator.locate(preferredTitle: MusicManager.shared.songTitle)
         guard shouldRun, !Task.isCancelled else { return }
+        Self.log.notice("tick: \(String(describing: location), privacy: .public) screenRecording=\(self.hasScreenRecordingPermission, privacy: .public) restart=\(self.requiresRestart, privacy: .public)")
 
         switch location {
         case .needsAccessibility:
@@ -342,6 +367,7 @@ final class LiveVideoCapture: ObservableObject {
             let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)
             guard shouldRun, lastTarget?.windowKey == target.windowKey else { return }
             guard let window = Self.matchWindow(for: target, in: content.windows) else {
+                Self.log.notice("startStream: no SCWindow matches the located window")
                 state = .notVisible
                 return
             }
@@ -385,6 +411,7 @@ final class LiveVideoCapture: ObservableObject {
             streamConfiguration = configuration
             updateAspectRatio(crop.size)
             state = .streaming
+            Self.log.notice("startStream: streaming crop=\(NSStringFromRect(crop), privacy: .public)")
         } catch {
             handleStreamFailure(error)
         }
@@ -405,6 +432,7 @@ final class LiveVideoCapture: ObservableObject {
     }
 
     private func handleStreamFailure(_ error: Error) {
+        Self.log.error("stream failure: \(String(describing: error), privacy: .public)")
         stopStream()
         retryAfter = Date().addingTimeInterval(Self.retryDelay)
         let declined = (error as? SCStreamError)?.code == .userDeclined

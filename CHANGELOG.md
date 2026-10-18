@@ -6,6 +6,7 @@ All changes relative to the upstream base, Boring Notch commit `64b5459` (see [N
 
 ### Added
 
+- **Live video**: the playing Chrome video replaces the music artwork in the notch. Drag it out (or click the pop-out button) to float it over every app, move it anywhere, resize it from its edges, enlarge it, and drop it back on the notch. Setup is a one-click card for Accessibility and Screen Recording.
 - **Notes** tab: a plain-text scratchpad saved automatically.
 - **To-dos** tab: add, complete, delete and clear completed items.
 - **Timer** tab: presets, fine tuning, pause / resume, sound when finished, and a live activity in the closed notch.
@@ -24,6 +25,7 @@ All changes relative to the upstream base, Boring Notch commit `64b5459` (see [N
 - Tab bar and header buttons restyled; tabs shrink to fit beside the notch.
 - Notch cover in the header now stays centered over the hardware notch.
 - Shared keyboard-focus handling for text input in the notch.
+- Builds are signed with a local "Deckmian Local Signing" certificate (see README) so macOS permissions survive rebuilds; library validation is disabled for the self-signed identity.
 
 ### Removed
 

@@ -24,7 +24,7 @@ struct LiveVideoSlotControls: View {
                         action: capture.returnToNotch
                     )
                 } else if capture.state == .streaming, isHovering {
-                    slotButton(symbol: "pip.exit", help: "Open the video in a floating window", action: capture.popOut)
+                    popOutButton
                 }
             }
         }
@@ -32,6 +32,23 @@ struct LiveVideoSlotControls: View {
         .animation(.smooth(duration: 0.2), value: isHovering)
         .animation(.smooth(duration: 0.2), value: capture.state)
         .animation(.smooth(duration: 0.2), value: capture.isPoppedOut)
+    }
+
+    /// Pop-out affordance: the video can also be dragged out of the slot.
+    private var popOutButton: some View {
+        Button(action: capture.popOut) {
+            Image(systemName: "pip.exit")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 7)
+                .frame(height: 18)
+                .background(Capsule().fill(Color.black.opacity(0.65)))
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.15), lineWidth: 0.5))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .help("Drag out or click to float")
+        .transition(.scale.combined(with: .opacity))
     }
 
     private func slotButton(symbol: String, help: String, action: @escaping () -> Void) -> some View {
