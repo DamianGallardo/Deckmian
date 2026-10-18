@@ -294,6 +294,25 @@ final class XPCHelperClient: NSObject {
             return []
         }
     }
+
+    // MARK: - Live video
+
+    /// Locates the video playing in Google Chrome through Accessibility (see `ChromeVideoKeys`).
+    /// Returns nil when the helper is unreachable.
+    nonisolated func locateChromeVideo(preferredTitle: String) async -> [String: String]? {
+        do {
+            let service = await MainActor.run {
+                ensureRemoteService()
+            }
+            return try await service.withContinuation { service, continuation in
+                service.locateChromeVideo(preferredTitle) { result in
+                    continuation.resume(returning: result)
+                }
+            }
+        } catch {
+            return nil
+        }
+    }
 }
 
 extension Notification.Name {

@@ -27,6 +27,8 @@ struct MusicPlayerView: View {
 struct AlbumArtView: View {
     @ObservedObject var musicManager = MusicManager.shared
     @ObservedObject var vm: BoringViewModel
+    @ObservedObject var liveVideo = LiveVideoCapture.shared
+    @State private var isHoveringArtwork = false
     let albumArtNamespace: Namespace.ID
 
     var body: some View {
@@ -36,6 +38,16 @@ struct AlbumArtView: View {
             }
             albumArtButton
         }
+        .overlay(alignment: .topTrailing) {
+            LiveVideoSlotControls(isHovering: isHoveringArtwork)
+        }
+        .onHover { isHoveringArtwork = $0 }
+        .liveVideoConsumer(.notchSlot, isActive: vm.notchState == .open)
+    }
+
+    /// The live Chrome video replaces the artwork while it streams and is not popped out.
+    private var showsLiveVideo: Bool {
+        liveVideo.isEligible && liveVideo.state == .streaming && !liveVideo.isPoppedOut
     }
 
     private var albumArtBackground: some View {
@@ -70,6 +82,13 @@ struct AlbumArtView: View {
             
             albumArtDarkOverlay
         }
+        .overlay {
+            LiveVideoSetupCard(
+                cornerRadius: Defaults[.cornerRadiusScaling]
+                    ? MusicPlayerImageSizes.cornerRadiusInset.opened
+                    : MusicPlayerImageSizes.cornerRadiusInset.closed
+            )
+        }
     }
 
     private var albumArtDarkOverlay: some View {
@@ -82,9 +101,7 @@ struct AlbumArtView: View {
                 
 
     private var albumArtImage: some View {
-        Image(nsImage: musicManager.albumArt)
-            .resizable()
-            .aspectRatio(1, contentMode: .fit)
+        artworkContent
             .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
             .clipped()
             .clipShape(
@@ -93,6 +110,19 @@ struct AlbumArtView: View {
                         ? MusicPlayerImageSizes.cornerRadiusInset.opened
                         : MusicPlayerImageSizes.cornerRadiusInset.closed)
             )
+    }
+
+    @ViewBuilder
+    private var artworkContent: some View {
+        if showsLiveVideo {
+            Color.black
+                .aspectRatio(1, contentMode: .fit)
+                .overlay(LiveVideoView(fill: true))
+        } else {
+            Image(nsImage: musicManager.albumArt)
+                .resizable()
+                .aspectRatio(1, contentMode: .fit)
+        }
     }
 
     @ViewBuilder

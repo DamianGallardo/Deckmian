@@ -674,6 +674,8 @@ struct Media: View {
                 }
             }
             
+            LiveVideoSettingsSection()
+
             Section {
                 Toggle(
                     "Show music live activity",
@@ -738,6 +740,41 @@ struct Media: View {
             return MediaControllerType.allCases.filter { $0 != .nowPlaying }
         } else {
             return MediaControllerType.allCases
+        }
+    }
+}
+
+/// "Live video" section of the Media page: Chrome video in place of the artwork.
+private struct LiveVideoSettingsSection: View {
+    @ObservedObject var capture = LiveVideoCapture.shared
+    @Default(.liveVideoArtwork) var liveVideoArtwork
+
+    var body: some View {
+        Section {
+            Toggle("Show live video from Chrome", isOn: $liveVideoArtwork)
+            if liveVideoArtwork {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Status")
+                    Spacer()
+                    Text(capture.statusDescription)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.trailing)
+                    if let step = capture.pendingSetupStep {
+                        Button(step == .restart ? "Restart Deckmian" : "Enable") {
+                            capture.enable()
+                        }
+                    }
+                }
+            }
+        } header: {
+            Text("Live video")
+        } footer: {
+            Text("Accessibility lets Deckmian find the video playing in Chrome. Screen Recording lets it show that video in the notch and in a floating window.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .task {
+            await capture.refreshPermissions()
         }
     }
 }

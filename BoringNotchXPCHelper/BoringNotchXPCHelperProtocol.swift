@@ -28,12 +28,42 @@ import Foundation
     // Bluetooth device details (performed by the unsandboxed helper via system_profiler)
     /// Replies with one dictionary per connected Bluetooth device (see `BluetoothDeviceKeys`); empty on failure.
     func bluetoothBatteryLevels(with reply: @escaping ([[String: String]]) -> Void)
+    // Live video (performed by the helper through the Accessibility tree of Google Chrome)
+    /// Replies with the frame of the video playing in Chrome, keyed by `ChromeVideoKeys`.
+    /// `preferredTitle` (the current song) picks between several windows; pass "" when unknown.
+    func locateChromeVideo(_ preferredTitle: String, with reply: @escaping ([String: String]) -> Void)
 }
 
 /// Dictionary keys used to transfer shortcut descriptions over XPC.
 enum SystemShortcutKeys {
     static let name = "name"
     static let identifier = "identifier"
+}
+
+/// Dictionary keys used to transfer the location of Chrome's video over XPC.
+/// Frames are global screen points with a top-left origin, encoded as decimal strings.
+enum ChromeVideoKeys {
+    static let status = "status"
+    static let statusFound = "found"
+    static let statusNotFound = "notFound"
+    static let statusNotTrusted = "notTrusted"
+    static let statusChromeNotRunning = "chromeNotRunning"
+    /// `CGWindowID` of the Chrome window ("0" when unknown).
+    static let windowID = "windowID"
+    static let windowX = "windowX"
+    static let windowY = "windowY"
+    static let windowWidth = "windowWidth"
+    static let windowHeight = "windowHeight"
+    /// Visible part of the video (clipped to the viewport).
+    static let videoX = "videoX"
+    static let videoY = "videoY"
+    static let videoWidth = "videoWidth"
+    static let videoHeight = "videoHeight"
+    static let title = "title"
+    /// `kindVideo` for the `<video>` element, `kindPlayer` for a player box that may include bars.
+    static let kind = "kind"
+    static let kindVideo = "video"
+    static let kindPlayer = "player"
 }
 
 /// Dictionary keys used to transfer connected Bluetooth device details over XPC.

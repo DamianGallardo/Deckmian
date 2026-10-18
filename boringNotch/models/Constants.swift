@@ -222,7 +222,17 @@ extension Defaults.Keys {
     
     // MARK: Media Controller
     static let mediaController = Key<MediaControllerType>("mediaController", default: defaultMediaController)
-    
+
+    // MARK: Live video
+    /// Shows the live Chrome video in place of the artwork when Chrome is the media source.
+    static let liveVideoArtwork = Key<Bool>("liveVideoArtwork", default: true)
+    /// Last frame of the floating video window, as `NSStringFromRect` (empty until first use).
+    static let floatingVideoFrame = Key<String>("floatingVideoFrame", default: "")
+    /// The user closed the live video setup card in the notch (Settings still offers "Enable").
+    static let liveVideoSetupDismissed = Key<Bool>("liveVideoSetupDismissed", default: false)
+    /// Screen Recording was requested once; later requests open System Settings directly.
+    static let liveVideoRequestedScreenRecording = Key<Bool>("liveVideoRequestedScreenRecording", default: false)
+
     // MARK: Advanced Settings
     static let useCustomAccentColor = Key<Bool>("useCustomAccentColor", default: false)
     static let customAccentColorData = Key<Data?>("customAccentColorData", default: nil)

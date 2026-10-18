@@ -157,6 +157,12 @@
 		B1F747F92EC7E94000F841DB /* LottieView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1F747F82EC7E94000F841DB /* LottieView.swift */; };
 		B1FEB4992C7686630066EBBC /* PanGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1FEB4982C7686630066EBBC /* PanGesture.swift */; };
 		F38DE6482D8243E7008B5C6D /* BatteryActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F38DE6472D8243E2008B5C6D /* BatteryActivityManager.swift */; };
+		4C1D5E6F7A8B9C0D1E2F3A11 /* BrowserVideoLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1D5E6F7A8B9C0D1E2F3A01 /* BrowserVideoLocator.swift */; };
+		4C1D5E6F7A8B9C0D1E2F3A12 /* LiveVideoFrameSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1D5E6F7A8B9C0D1E2F3A02 /* LiveVideoFrameSink.swift */; };
+		4C1D5E6F7A8B9C0D1E2F3A13 /* LiveVideoCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1D5E6F7A8B9C0D1E2F3A03 /* LiveVideoCapture.swift */; };
+		4C1D5E6F7A8B9C0D1E2F3A14 /* LiveVideoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1D5E6F7A8B9C0D1E2F3A04 /* LiveVideoView.swift */; };
+		4C1D5E6F7A8B9C0D1E2F3A15 /* FloatingVideoWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1D5E6F7A8B9C0D1E2F3A05 /* FloatingVideoWindowController.swift */; };
+		4C1D5E6F7A8B9C0D1E2F3A16 /* LiveVideoSlotControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C1D5E6F7A8B9C0D1E2F3A06 /* LiveVideoSlotControls.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -338,6 +344,12 @@
 		B1F747F82EC7E94000F841DB /* LottieView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LottieView.swift; sourceTree = "<group>"; };
 		B1FEB4982C7686630066EBBC /* PanGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanGesture.swift; sourceTree = "<group>"; };
 		F38DE6472D8243E2008B5C6D /* BatteryActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryActivityManager.swift; sourceTree = "<group>"; };
+		4C1D5E6F7A8B9C0D1E2F3A01 /* BrowserVideoLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserVideoLocator.swift; sourceTree = "<group>"; };
+		4C1D5E6F7A8B9C0D1E2F3A02 /* LiveVideoFrameSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveVideoFrameSink.swift; sourceTree = "<group>"; };
+		4C1D5E6F7A8B9C0D1E2F3A03 /* LiveVideoCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveVideoCapture.swift; sourceTree = "<group>"; };
+		4C1D5E6F7A8B9C0D1E2F3A04 /* LiveVideoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveVideoView.swift; sourceTree = "<group>"; };
+		4C1D5E6F7A8B9C0D1E2F3A05 /* FloatingVideoWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingVideoWindowController.swift; sourceTree = "<group>"; };
+		4C1D5E6F7A8B9C0D1E2F3A06 /* LiveVideoSlotControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveVideoSlotControls.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -527,6 +539,7 @@
 				7A1C3E5F9B2D4A6C8E0F1A07 /* Timer */,
 				5D4E8C2A7B1F3E9A6C0D2B05 /* SystemShortcuts */,
 				B7E1D2C3A4F5061728394A07 /* Bluetooth */,
+				4C1D5E6F7A8B9C0D1E2F3A20 /* LiveVideo */,
 				B186542E2C6F453B000B926A /* Music */,
 				14D570BF2C5EA5870011E668 /* AnimatedFace.swift */,
 				14288DE72C6E01C800B9F80C /* ProgressIndicator.swift */,
@@ -697,6 +710,19 @@
 				6A61D8ABB9DAF26EC89B2746 /* TodosView.swift */,
 			);
 			path = Todos;
+			sourceTree = "<group>";
+		};
+		4C1D5E6F7A8B9C0D1E2F3A20 /* LiveVideo */ = {
+			isa = PBXGroup;
+			children = (
+				4C1D5E6F7A8B9C0D1E2F3A01 /* BrowserVideoLocator.swift */,
+				4C1D5E6F7A8B9C0D1E2F3A02 /* LiveVideoFrameSink.swift */,
+				4C1D5E6F7A8B9C0D1E2F3A03 /* LiveVideoCapture.swift */,
+				4C1D5E6F7A8B9C0D1E2F3A04 /* LiveVideoView.swift */,
+				4C1D5E6F7A8B9C0D1E2F3A05 /* FloatingVideoWindowController.swift */,
+				4C1D5E6F7A8B9C0D1E2F3A06 /* LiveVideoSlotControls.swift */,
+			);
+			path = LiveVideo;
 			sourceTree = "<group>";
 		};
 		B7E1D2C3A4F5061728394A07 /* Bluetooth */ = {
@@ -1005,6 +1031,12 @@
 				7A1C3E5F9B2D4A6C8E0F1A04 /* TimerStore.swift in Sources */,
 				7A1C3E5F9B2D4A6C8E0F1A05 /* TimerView.swift in Sources */,
 				7A1C3E5F9B2D4A6C8E0F1A06 /* TimerLiveActivity.swift in Sources */,
+				4C1D5E6F7A8B9C0D1E2F3A11 /* BrowserVideoLocator.swift in Sources */,
+				4C1D5E6F7A8B9C0D1E2F3A12 /* LiveVideoFrameSink.swift in Sources */,
+				4C1D5E6F7A8B9C0D1E2F3A13 /* LiveVideoCapture.swift in Sources */,
+				4C1D5E6F7A8B9C0D1E2F3A14 /* LiveVideoView.swift in Sources */,
+				4C1D5E6F7A8B9C0D1E2F3A15 /* FloatingVideoWindowController.swift in Sources */,
+				4C1D5E6F7A8B9C0D1E2F3A16 /* LiveVideoSlotControls.swift in Sources */,
 				B7E1D2C3A4F5061728394A04 /* BluetoothManager.swift in Sources */,
 				B7E1D2C3A4F5061728394A05 /* BluetoothView.swift in Sources */,
 				B7E1D2C3A4F5061728394A06 /* BluetoothLiveActivity.swift in Sources */,
@@ -1327,7 +1359,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSBackgroundOnly = NO;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "This app uses AppleEvents to control music";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Deckmian uses Apple Events to control music apps and to locate the video playing in Google Chrome so it can show it live in the notch.";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Deckmian uses Bluetooth to show your connected devices.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "This app uses the calendar to display your calendar events";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to display a live camera view";
@@ -1382,7 +1414,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSBackgroundOnly = NO;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "This app uses AppleEvents to control music";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Deckmian uses Apple Events to control music apps and to locate the video playing in Google Chrome so it can show it live in the notch.";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Deckmian uses Bluetooth to show your connected devices.";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "This app uses the calendar to display your calendar events";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app uses the camera to display a live camera view";
