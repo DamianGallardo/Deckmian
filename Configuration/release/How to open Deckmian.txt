@@ -1,0 +1,27 @@
+DECKMIAN — HOW TO INSTALL / CÓMO INSTALAR
+
+English
+-------
+1. Drag Deckmian into the Applications folder.
+2. Open Deckmian. macOS will say it can't verify the developer. Click "Done".
+3. Open System Settings > Privacy & Security, scroll down and click "Open Anyway" next to Deckmian.
+4. Confirm with your password. You only need to do this once.
+
+Alternative (Terminal):
+    xattr -dr com.apple.quarantine /Applications/Deckmian.app
+
+Deckmian is free software (GPL-3.0), based on Boring Notch.
+It is not notarized by Apple, which is why macOS asks for confirmation.
+
+Español
+-------
+1. Arrastrá Deckmian a la carpeta Aplicaciones.
+2. Abrí Deckmian. macOS va a decir que no puede verificar al desarrollador. Tocá "Aceptar".
+3. Abrí Configuración del Sistema > Privacidad y seguridad, bajá y tocá "Abrir igualmente" junto a Deckmian.
+4. Confirmá con tu contraseña. Solo hace falta la primera vez.
+
+Alternativa (Terminal):
+    xattr -dr com.apple.quarantine /Applications/Deckmian.app
+
+Deckmian es software libre (GPL-3.0), basado en Boring Notch.
+No está notarizado por Apple, por eso macOS pide confirmación.

@@ -17,10 +17,12 @@ All changes relative to the upstream base, Boring Notch commit `64b5459` (see [N
 - **Layout** settings: tab order and Home widget order, visibility, spacing and dividers.
 - Deckmian app icon.
 - Documentation: README, NOTICE, architecture guide and this changelog.
+- Release script that builds a universal app and packages `dist/Deckmian-<version>.dmg` with install instructions.
 
 ### Changed
 
 - App renamed to Deckmian in the product name and visible UI.
+- Own bundle identifiers (`com.damiangallardo.deckmian`) and version reset to 0.1.0.
 - Source folders, Xcode project, targets and XPC helper product renamed to Deckmian (`Deckmian/`, `DeckmianXPCHelper/`, `Deckmian.xcodeproj`). Bundle identifiers are unchanged.
 - Tab bar and header buttons restyled; tabs shrink to fit beside the notch.
 - Notch cover in the header now stays centered over the hardware notch.

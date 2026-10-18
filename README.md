@@ -60,9 +60,19 @@ Everything new can be turned on or off in **Settings**:
 | Appearance | Glass mode and glass tint |
 | General → Lock | Show or hide the lock button |
 
+## Releasing a DMG
+
+```bash
+./Configuration/release/make-release.sh
+```
+
+This builds a universal (Apple Silicon + Intel) Release signed with the local identity and writes `dist/Deckmian-<version>.dmg`, including install instructions. Bump `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` first.
+
+The DMG is **not notarized** (that needs a paid Apple Developer account), so users must allow it once: open the app, then **System Settings → Privacy & Security → Open Anyway** (or run `xattr -dr com.apple.quarantine /Applications/Deckmian.app`). Always release with the same signing identity so users keep their macOS permissions across updates.
+
 ## Updating
 
-Deckmian has no auto-update mechanism. Pull your changes and rebuild from source.
+Deckmian has no auto-update mechanism. Download the new DMG, or pull and rebuild from source.
 
 ## Documentation
 
