@@ -73,7 +73,6 @@ extension Defaults.Keys {
     static let menubarIcon = Key<Bool>("menubarIcon", default: true)
     static let showOnAllDisplays = Key<Bool>("showOnAllDisplays", default: false)
     static let automaticallySwitchDisplay = Key<Bool>("automaticallySwitchDisplay", default: true)
-    static let releaseName = Key<String>("releaseName", default: "Flying Rabbit 🐇🪽")
     
     // MARK: Behavior
     static let minimumHoverDuration = Key<TimeInterval>("minimumHoverDuration", default: 0.3)
@@ -104,6 +103,11 @@ extension Defaults.Keys {
     static let enableShadow = Key<Bool>("enableShadow", default: true)
     static let cornerRadiusScaling = Key<Bool>("cornerRadiusScaling", default: true)
 
+    // MARK: Glass mode
+    static let glassMode = Key<Bool>("glassMode", default: false)
+    /// Opacity (0...0.8) of the dark tint layered over the glass to keep content readable
+    static let glassModeTint = Key<Double>("glassModeTint", default: 0.25)
+
     static let showNotHumanFace = Key<Bool>("showNotHumanFace", default: false)
     static let tileShowLabels = Key<Bool>("tileShowLabels", default: false)
     static let showCalendar = Key<Bool>("showCalendar", default: false)
@@ -117,6 +121,9 @@ extension Defaults.Keys {
     static let customVisualizers = Key<[CustomVisualizer]>("customVisualizers", default: [])
     static let selectedVisualizer = Key<CustomVisualizer?>("selectedVisualizer", default: nil)
     
+    // MARK: Lock
+    static let showLockButton = Key<Bool>("showLockButton", default: true)
+
     // MARK: Gestures
     static let enableGestures = Key<Bool>("enableGestures", default: true)
     static let closeGestureEnabled = Key<Bool>("closeGestureEnabled", default: true)
@@ -171,6 +178,39 @@ extension Defaults.Keys {
     static let autoRemoveShelfItems = Key<Bool>("autoRemoveShelfItems", default: false)
     static let expandedDragDetection = Key<Bool>("expandedDragDetection", default: true)
     
+    // MARK: Notes
+    static let enableNotes = Key<Bool>("enableNotes", default: true)
+
+    // MARK: To-dos
+    static let enableTodos = Key<Bool>("enableTodos", default: true)
+
+    // MARK: Timer
+    static let enableTimer = Key<Bool>("enableTimer", default: true)
+    static let timerLiveActivity = Key<Bool>("timerLiveActivity", default: true)
+    static let timerPlaySound = Key<Bool>("timerPlaySound", default: true)
+    static let timerLastDuration = Key<TimeInterval>("timerLastDuration", default: 5 * 60)
+
+    // MARK: Shortcuts tab
+    static let enableShortcutsTab = Key<Bool>("enableShortcutsTab", default: true)
+    /// Identifiers of the shortcuts shown in the notch, in display order.
+    static let pinnedShortcuts = Key<[String]>("pinnedShortcuts", default: [])
+    /// Last successfully fetched shortcut list, so the tab renders instantly before refreshing.
+    static let cachedShortcuts = Key<[ShortcutInfo]>("cachedShortcuts", default: [])
+
+    // MARK: Bluetooth
+    static let enableBluetooth = Key<Bool>("enableBluetooth", default: true)
+    static let bluetoothLiveActivity = Key<Bool>("bluetoothLiveActivity", default: true)
+
+    // MARK: Layout
+    /// Tab order in the open notch; normalize with `normalizedOrder()` before use.
+    static let tabOrder = Key<[NotchViews]>("tabOrder", default: NotchViews.defaultOrder)
+    /// Home tab widget order; normalize with `normalizedOrder()` before use.
+    static let homeWidgetOrder = Key<[HomeWidget]>("homeWidgetOrder", default: HomeWidget.defaultOrder)
+    static let showMusicWidget = Key<Bool>("showMusicWidget", default: true)
+    /// Gap between Home widgets (0...24); tightened when the calendar and mirror share the row.
+    static let homeWidgetSpacing = Key<Double>("homeWidgetSpacing", default: 15)
+    static let showWidgetDividers = Key<Bool>("showWidgetDividers", default: false)
+
     // MARK: Calendar
     static let calendarSelectionState = Key<CalendarSelectionState>("calendarSelectionState", default: .all)
     static let hideAllDayEvents = Key<Bool>("hideAllDayEvents", default: false)

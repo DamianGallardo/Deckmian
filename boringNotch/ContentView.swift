@@ -23,6 +23,8 @@ struct ContentView: View {
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     @ObservedObject var brightnessManager = BrightnessManager.shared
     @ObservedObject var volumeManager = VolumeManager.shared
+    @ObservedObject var timerStore = TimerStore.shared
+    @ObservedObject var bluetoothManager = BluetoothManager.shared
     @State private var hoverTask: Task<Void, Never>?
     @State private var isHovering: Bool = false
     @State private var anyDropDebounceTask: Task<Void, Never>?
@@ -36,6 +38,11 @@ struct ContentView: View {
     @Default(.useMusicVisualizer) var useMusicVisualizer
 
     @Default(.showNotHumanFace) var showNotHumanFace
+
+    @Default(.enableTimer) var enableTimer
+    @Default(.timerLiveActivity) var timerLiveActivity
+
+    @Default(.glassMode) var glassMode
 
     // Shared interactive spring for movement/resizing to avoid conflicting animations
     private let animationSpring = Animation.interactiveSpring(response: 0.38, dampingFraction: 0.8, blendDuration: 0)
@@ -58,6 +65,19 @@ struct ContentView: View {
         )
     }
 
+    /// The timer live activity outranks the music one in the closed notch: a running countdown is more
+    /// time-sensitive than now-playing info. Battery notifications and inline HUDs still take precedence.
+    private var showsTimerLiveActivity: Bool {
+        vm.notchState == .closed && enableTimer && timerLiveActivity && timerStore.isActive && !vm.hideOnClosed
+    }
+
+    /// Short-lived announcement of a Bluetooth device connecting or disconnecting; it briefly
+    /// outranks the timer and music live activities, like the timer's own "Time's up" peek.
+    private var showsBluetoothLiveActivity: Bool {
+        vm.notchState == .closed && coordinator.expandingView.show && coordinator.expandingView.type == .bluetooth
+            && bluetoothManager.lastEvent != nil && !vm.hideOnClosed
+    }
+
     private var computedChinWidth: CGFloat {
         var chinWidth: CGFloat = vm.closedNotchSize.width
 
@@ -65,6 +85,16 @@ struct ContentView: View {
             && vm.notchState == .closed && Defaults[.showPowerStatusNotifications]
         {
             chinWidth = 640
+        } else if showsBluetoothLiveActivity {
+            let wing = BluetoothLiveActivity.wingWidth(notchHeight: vm.effectiveClosedNotchHeight)
+            chinWidth += (2 * wing + 20)
+        } else if showsTimerLiveActivity {
+            let wing = TimerLiveActivity.wingWidth(
+                remaining: timerStore.remaining,
+                expanded: coordinator.expandingView.show && coordinator.expandingView.type == .timer,
+                notchHeight: vm.effectiveClosedNotchHeight
+            )
+            chinWidth += (2 * wing + 20)
         } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
             && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle)
             && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed
@@ -100,7 +130,10 @@ struct ContentView: View {
                         : cornerRadiusInsets.closed.bottom
                     )
                     .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-                    .background(.black)
+                    .background {
+                        // Solid black, or glass when open in Glass mode (closed stays black to blend with the hardware notch)
+                        NotchBackground(shape: currentNotchShape, isOpen: vm.notchState == .open)
+                    }
                     .clipShape(currentNotchShape)
                     .overlay(alignment: .top) {
                         Rectangle()
@@ -110,7 +143,7 @@ struct ContentView: View {
                     }
                     .shadow(
                         color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
-                            ? .black.opacity(0.7) : .clear, radius: Defaults[.cornerRadiusScaling] ? 6 : 4
+                            ? .black.opacity(glassMode ? 0.4 : 0.7) : .clear, radius: Defaults[.cornerRadiusScaling] ? 6 : 4
                     )
                     .padding(
                         .bottom,
@@ -153,7 +186,7 @@ struct ContentView: View {
                                 try? await Task.sleep(for: .milliseconds(100))
                                 guard !Task.isCancelled else { return }
                                 await MainActor.run {
-                                    if self.vm.notchState == .open && !self.isHovering && !self.vm.isBatteryPopoverActive && !SharingStateManager.shared.preventNotchClose {
+                                    if self.vm.notchState == .open && !self.isHovering && !self.vm.isBatteryPopoverActive && !SharingStateManager.shared.preventNotchClose && !self.coordinator.preventsAutoClose {
                                         self.vm.close()
                                     }
                                 }
@@ -167,6 +200,9 @@ struct ContentView: View {
                             }
                         }
                     }
+                    .onChange(of: coordinator.isNotchLocked) { _, locked in
+                        handleLockChange(locked)
+                    }
                     .onChange(of: vm.isBatteryPopoverActive) {
                         if !vm.isBatteryPopoverActive && !isHovering && vm.notchState == .open && !SharingStateManager.shared.preventNotchClose {
                             hoverTask?.cancel()
@@ -174,7 +210,7 @@ struct ContentView: View {
                                 try? await Task.sleep(for: .milliseconds(100))
                                 guard !Task.isCancelled else { return }
                                 await MainActor.run {
-                                    if !self.vm.isBatteryPopoverActive && !self.isHovering && self.vm.notchState == .open && !SharingStateManager.shared.preventNotchClose {
+                                    if !self.vm.isBatteryPopoverActive && !self.isHovering && self.vm.notchState == .open && !SharingStateManager.shared.preventNotchClose && !self.coordinator.preventsAutoClose {
                                         self.vm.close()
                                     }
                                 }
@@ -204,7 +240,10 @@ struct ContentView: View {
         }
         .padding(.bottom, 8)
         .frame(maxWidth: windowSize.width, maxHeight: windowSize.height, alignment: .top)
-        .compositingGroup()
+        // A compositing group would flatten the glass backdrop into an offscreen layer, so skip it in Glass mode
+        .conditionalModifier(!glassMode) { view in
+            view.compositingGroup()
+        }
         .scaleEffect(
             x: gestureScale,
             y: gestureScale,
@@ -235,7 +274,7 @@ struct ContentView: View {
                 }
 
                 vm.dropEvent = false
-                if !SharingStateManager.shared.preventNotchClose {
+                if !SharingStateManager.shared.preventNotchClose && !coordinator.preventsAutoClose {
                     vm.close()
                 }
             }
@@ -287,6 +326,12 @@ struct ContentView: View {
                       } else if coordinator.sneakPeek.show && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && vm.notchState == .closed {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(.opacity)
+                      } else if showsBluetoothLiveActivity {
+                          BluetoothLiveActivity()
+                              .frame(alignment: .center)
+                      } else if showsTimerLiveActivity {
+                          TimerLiveActivity()
+                              .frame(alignment: .center)
                       } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music) && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle) && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed {
                           MusicLiveActivity()
                               .frame(alignment: .center)
@@ -349,6 +394,16 @@ struct ContentView: View {
                         NotchHomeView(albumArtNamespace: albumArtNamespace)
                     case .shelf:
                         ShelfView()
+                    case .notes:
+                        NotesView()
+                    case .todos:
+                        TodosView()
+                    case .timer:
+                        TimerView()
+                    case .shortcuts:
+                        ShortcutsView()
+                    case .bluetooth:
+                        BluetoothView()
                     }
                 }
                 .transition(
@@ -549,9 +604,32 @@ struct ContentView: View {
                         self.isHovering = false
                     }
                     
-                    if self.vm.notchState == .open && !self.vm.isBatteryPopoverActive && !SharingStateManager.shared.preventNotchClose {
+                    if self.vm.notchState == .open && !self.vm.isBatteryPopoverActive && !SharingStateManager.shared.preventNotchClose && !self.coordinator.preventsAutoClose {
                         self.vm.close()
                     }
+                }
+            }
+        }
+    }
+
+    // MARK: - Lock Handling
+
+    /// When the notch is unlocked while the pointer is already outside of it,
+    /// close it the same way a hover exit would.
+    private func handleLockChange(_ locked: Bool) {
+        guard !locked, vm.notchState == .open, !vm.isMouseHovering() else { return }
+        hoverTask?.cancel()
+        hoverTask = Task {
+            try? await Task.sleep(for: .milliseconds(100))
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                withAnimation(animationSpring) {
+                    self.isHovering = false
+                }
+
+                if self.vm.notchState == .open && !self.vm.isMouseHovering() && !self.vm.isBatteryPopoverActive && !SharingStateManager.shared.preventNotchClose && !self.coordinator.preventsAutoClose {
+                    self.vm.close()
                 }
             }
         }

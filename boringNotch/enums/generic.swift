@@ -24,9 +24,25 @@ public enum NotchState {
     case open
 }
 
-public enum NotchViews {
+/// Declaration order is the default tab order (see `Defaults.Keys.tabOrder`).
+public enum NotchViews: String, CaseIterable, Codable, Defaults.Serializable {
     case home
     case shelf
+    case notes
+    case todos
+    case timer
+    case shortcuts
+    case bluetooth
+}
+
+extension NotchViews {
+    /// Views hosting a text input; the notch window may only become key while one of them is shown.
+    var acceptsKeyboardInput: Bool {
+        switch self {
+        case .notes, .todos: true
+        case .home, .shelf, .timer, .shortcuts, .bluetooth: false
+        }
+    }
 }
 
 enum SettingsEnum {

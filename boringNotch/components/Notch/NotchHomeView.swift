@@ -423,6 +423,12 @@ struct NotchHomeView: View {
     @ObservedObject var webcamManager = WebcamManager.shared
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     @ObservedObject var coordinator = BoringViewCoordinator.shared
+    @Default(.homeWidgetOrder) var homeWidgetOrder
+    @Default(.homeWidgetSpacing) var homeWidgetSpacing
+    @Default(.showWidgetDividers) var showWidgetDividers
+    @Default(.showMusicWidget) var showMusicWidget
+    @Default(.showCalendar) var showCalendar
+    @Default(.showMirror) var showMirror
     let albumArtNamespace: Namespace.ID
 
     var body: some View {
@@ -436,33 +442,74 @@ struct NotchHomeView: View {
     }
 
     private var shouldShowCamera: Bool {
-        Defaults[.showMirror] && webcamManager.cameraAvailable && vm.isCameraExpanded
+        showMirror && webcamManager.cameraAvailable && vm.isCameraExpanded
+    }
+
+    private func isVisible(_ widget: HomeWidget) -> Bool {
+        switch widget {
+        case .music: showMusicWidget
+        case .calendar: showCalendar
+        case .mirror: shouldShowCamera
+        }
+    }
+
+    private var visibleWidgets: [HomeWidget] {
+        homeWidgetOrder.normalizedOrder().filter(isVisible)
+    }
+
+    /// The user's spacing, tightened by a third when the calendar and camera share the row
+    /// (15pt -> 10pt with the default setting).
+    private var widgetSpacing: CGFloat {
+        let base = CGFloat(min(max(homeWidgetSpacing, 0), 24))
+        return (shouldShowCamera && showCalendar) ? base * 2 / 3 : base
     }
 
     private var mainContent: some View {
-        HStack(alignment: .top, spacing: (shouldShowCamera && Defaults[.showCalendar]) ? 10 : 15) {
-            MusicPlayerView(albumArtNamespace: albumArtNamespace)
-
-            if Defaults[.showCalendar] {
-                CalendarView()
-                    .frame(width: shouldShowCamera ? 170 : 215)
-                    .onHover { isHovering in
-                        vm.isHoveringCalendar = isHovering
-                    }
-                    .environmentObject(vm)
-                    .transition(.opacity)
-            }
-
-            if shouldShowCamera {
-                CameraPreviewView(webcamManager: webcamManager)
-                    .scaledToFit()
-                    .opacity(vm.notchState == .closed ? 0 : 1)
-                    .blur(radius: vm.notchState == .closed ? 20 : 0)
-                    .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.76, blendDuration: 0), value: shouldShowCamera)
+        let widgets = visibleWidgets
+        // With dividers, the gap is split evenly on both sides of the divider.
+        return HStack(alignment: .top, spacing: showWidgetDividers ? widgetSpacing / 2 : widgetSpacing) {
+            ForEach(Array(widgets.enumerated()), id: \.element) { index, widget in
+                if showWidgetDividers && index > 0 {
+                    widgetDivider
+                }
+                widgetView(for: widget)
             }
         }
+        // Centers the remaining widgets when none of them fills the row (e.g. music hidden).
+        .frame(maxWidth: .infinity)
+        .animation(.smooth, value: homeWidgetOrder)
         .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .top)), removal: .opacity))
         .blur(radius: vm.notchState == .closed ? 30 : 0)
+    }
+
+    private var widgetDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.12))
+            .frame(width: 1)
+            .padding(.vertical, 12)
+            .transition(.opacity)
+    }
+
+    @ViewBuilder
+    private func widgetView(for widget: HomeWidget) -> some View {
+        switch widget {
+        case .music:
+            MusicPlayerView(albumArtNamespace: albumArtNamespace)
+        case .calendar:
+            CalendarView()
+                .frame(width: shouldShowCamera ? 170 : 215)
+                .onHover { isHovering in
+                    vm.isHoveringCalendar = isHovering
+                }
+                .environmentObject(vm)
+                .transition(.opacity)
+        case .mirror:
+            CameraPreviewView(webcamManager: webcamManager)
+                .scaledToFit()
+                .opacity(vm.notchState == .closed ? 0 : 1)
+                .blur(radius: vm.notchState == .closed ? 20 : 0)
+                .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.76, blendDuration: 0), value: shouldShowCamera)
+        }
     }
 }
 

@@ -18,6 +18,8 @@ enum SneakContentType {
     case mic
     case battery
     case download
+    case timer
+    case bluetooth
 }
 
 struct sneakPeek {
@@ -50,7 +52,23 @@ struct ExpandedItem {
 class BoringViewCoordinator: ObservableObject {
     static let shared = BoringViewCoordinator()
 
-    @Published var currentView: NotchViews = .home
+    @Published var currentView: NotchViews = .home {
+        didSet {
+            if !currentView.acceptsKeyboardInput {
+                isEditingText = false
+            }
+        }
+    }
+    /// True while a text input (Notes, To-dos) has keyboard focus; keeps the notch from auto-closing.
+    @Published var isEditingText: Bool = false
+    /// True while the user has pinned the open notch with the header lock button.
+    /// Cleared whenever the notch actually closes (see `BoringViewModel.close()`).
+    @Published var isNotchLocked: Bool = false
+    /// Whether automatic close paths (hover exit, sharing finished, etc.) must keep the notch open.
+    /// Explicit close actions ignore this.
+    var preventsAutoClose: Bool {
+        isEditingText || isNotchLocked
+    }
     @Published var helloAnimationRunning: Bool = false
     private var sneakPeekDispatch: DispatchWorkItem?
     private var expandingViewDispatch: DispatchWorkItem?
@@ -100,6 +118,7 @@ class BoringViewCoordinator: ObservableObject {
     @Published var optionKeyPressed: Bool = true
     private var accessibilityObserver: Any?
     private var hudReplacementCancellable: AnyCancellable?
+    private var featureTabCancellables = Set<AnyCancellable>()
 
     private init() {
         // Perform migration from name-based to UUID-based storage
@@ -161,6 +180,13 @@ class BoringViewCoordinator: ObservableObject {
                 }
             }
 
+        // Leave a feature tab when its feature gets disabled while it is shown
+        returnHome(from: .notes, whenDisabled: .enableNotes)
+        returnHome(from: .todos, whenDisabled: .enableTodos)
+        returnHome(from: .timer, whenDisabled: .enableTimer)
+        returnHome(from: .shortcuts, whenDisabled: .enableShortcutsTab)
+        returnHome(from: .bluetooth, whenDisabled: .enableBluetooth)
+
         Task { @MainActor in
             helloAnimationRunning = firstLaunch
 
@@ -174,7 +200,19 @@ class BoringViewCoordinator: ObservableObject {
             }
         }
     }
-    
+
+    /// Switches back to the home view when `key` is turned off while `view` is shown.
+    private func returnHome(from view: NotchViews, whenDisabled key: Defaults.Key<Bool>) {
+        Defaults.publisher(key)
+            .sink { [weak self] change in
+                Task { @MainActor in
+                    guard let self = self, !change.newValue, self.currentView == view else { return }
+                    self.currentView = .home
+                }
+            }
+            .store(in: &featureTabCancellables)
+    }
+
     @objc func sneakPeekEvent(_ notification: Notification) {
         let decoder = JSONDecoder()
         if let decodedData = try? decoder.decode(

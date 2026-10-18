@@ -8,11 +8,20 @@
 import AppKit
 import SwiftUI
 import Defaults
-import Sparkle
+
+/// Lets other parts of the app ask the settings window to show a specific sidebar page.
+@MainActor
+final class SettingsNavigation: ObservableObject {
+    static let shared = SettingsNavigation()
+
+    /// The sidebar value of the page to show next; consumed (reset to nil) by `SettingsView`.
+    @Published var requestedPage: String?
+
+    private init() {}
+}
 
 class SettingsWindowController: NSWindowController {
     static let shared = SettingsWindowController()
-    private var updaterController: SPUStandardUpdaterController?
     
     private init() {
         let window = NSWindow(
@@ -31,16 +40,10 @@ class SettingsWindowController: NSWindowController {
         fatalError("init(coder:) has not been implemented")
     }
     
-    func setUpdaterController(_ controller: SPUStandardUpdaterController) {
-        self.updaterController = controller
-        // Recreate the content view with the proper updater controller
-        setupWindow()
-    }
-    
     private func setupWindow() {
         guard let window = window else { return }
         
-        window.title = "Boring Notch Settings"
+        window.title = "Deckmian Settings"
         window.titlebarAppearsTransparent = false
         window.titleVisibility = .visible
         window.toolbarStyle = .unified
@@ -58,7 +61,7 @@ class SettingsWindowController: NSWindowController {
         window.identifier = NSUserInterfaceItemIdentifier("BoringNotchSettingsWindow")
         
         // Create the SwiftUI content
-        let settingsView = SettingsView(updaterController: updaterController)
+        let settingsView = SettingsView()
         let hostingView = NSHostingView(rootView: settingsView)
         window.contentView = hostingView
         
@@ -66,6 +69,13 @@ class SettingsWindowController: NSWindowController {
         window.delegate = self
     }
     
+    /// Shows the settings window on the sidebar page whose value is `page`.
+    @MainActor
+    func showWindow(page: String) {
+        SettingsNavigation.shared.requestedPage = page
+        showWindow()
+    }
+
     func showWindow() {
         // Set app to regular mode first
         NSApp.setActivationPolicy(.regular)

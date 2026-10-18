@@ -202,6 +202,10 @@ class BoringViewModel: NSObject, ObservableObject {
         if SharingStateManager.shared.preventNotchClose {
             return
         }
+        // Any real open -> closed transition ends a lock; it never survives a close
+        if self.notchState == .open {
+            self.coordinator.isNotchLocked = false
+        }
         self.notchSize = getClosedNotchSize(screenUUID: self.screenUUID)
         self.closedNotchSize = self.notchSize
         self.notchState = .closed

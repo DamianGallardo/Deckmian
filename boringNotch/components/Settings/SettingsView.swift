@@ -10,19 +10,12 @@ import Defaults
 import EventKit
 import KeyboardShortcuts
 import LaunchAtLogin
-import Sparkle
 import SwiftUI
 import SwiftUIIntrospect
 
 struct SettingsView: View {
     @State private var selectedTab = "General"
     @State private var accentColorUpdateTrigger = UUID()
-
-    let updaterController: SPUStandardUpdaterController?
-
-    init(updaterController: SPUStandardUpdaterController? = nil) {
-        self.updaterController = updaterController
-    }
 
     var body: some View {
         NavigationSplitView {
@@ -32,6 +25,9 @@ struct SettingsView: View {
                 }
                 NavigationLink(value: "Appearance") {
                     Label("Appearance", systemImage: "eye")
+                }
+                NavigationLink(value: "Layout") {
+                    Label("Layout", systemImage: "rectangle.3.group")
                 }
                 NavigationLink(value: "Media") {
                     Label("Media", systemImage: "play.laptopcomputer")
@@ -51,8 +47,23 @@ struct SettingsView: View {
                 NavigationLink(value: "Shelf") {
                     Label("Shelf", systemImage: "books.vertical")
                 }
+                NavigationLink(value: "Notes") {
+                    Label("Notes", systemImage: "note.text")
+                }
+                NavigationLink(value: "To-dos") {
+                    Label("To-dos", systemImage: "checklist")
+                }
+                NavigationLink(value: "Timer") {
+                    Label("Timer", systemImage: "timer")
+                }
                 NavigationLink(value: "Shortcuts") {
                     Label("Shortcuts", systemImage: "keyboard")
+                }
+                NavigationLink(value: SystemShortcutsSettings.pageID) {
+                    Label("Shortcuts app", systemImage: "square.grid.2x2")
+                }
+                NavigationLink(value: "Bluetooth") {
+                    Label("Bluetooth", systemImage: "dot.radiowaves.left.and.right")
                 }
                 // NavigationLink(value: "Extensions") {
                 //     Label("Extensions", systemImage: "puzzlepiece.extension")
@@ -75,6 +86,8 @@ struct SettingsView: View {
                     GeneralSettings()
                 case "Appearance":
                     Appearance()
+                case "Layout":
+                    LayoutSettings()
                 case "Media":
                     Media()
                 case "Calendar":
@@ -85,22 +98,24 @@ struct SettingsView: View {
                     Charge()
                 case "Shelf":
                     Shelf()
+                case "Notes":
+                    NotesSettings()
+                case "To-dos":
+                    TodosSettings()
+                case "Timer":
+                    TimerSettings()
                 case "Shortcuts":
                     Shortcuts()
+                case SystemShortcutsSettings.pageID:
+                    SystemShortcutsSettings()
+                case "Bluetooth":
+                    BluetoothSettings()
                 case "Extensions":
                     GeneralSettings()
                 case "Advanced":
                     Advanced()
                 case "About":
-                    if let controller = updaterController {
-                        About(updaterController: controller)
-                    } else {
-                        // Fallback with a default controller
-                        About(
-                            updaterController: SPUStandardUpdaterController(
-                                startingUpdater: false, updaterDelegate: nil,
-                                userDriverDelegate: nil))
-                    }
+                    About()
                 default:
                     GeneralSettings()
                 }
@@ -123,6 +138,13 @@ struct SettingsView: View {
         .id(accentColorUpdateTrigger)
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AccentColorChanged"))) { _ in
             accentColorUpdateTrigger = UUID()
+        }
+        .onReceive(SettingsNavigation.shared.$requestedPage) { page in
+            guard let page else { return }
+            selectedTab = page
+            DispatchQueue.main.async {
+                SettingsNavigation.shared.requestedPage = nil
+            }
         }
     }
 }
@@ -344,6 +366,19 @@ struct GeneralSettings: View {
             }
         } header: {
             Text("Notch behavior")
+        }
+
+        Section {
+            Defaults.Toggle(key: .showLockButton) {
+                Text("Show lock button")
+            }
+        } header: {
+            Text("Lock")
+        } footer: {
+            Text("Keeps the notch open until you unlock it or close it explicitly.")
+                .multilineTextAlignment(.trailing)
+                .foregroundStyle(.secondary)
+                .font(.caption)
         }
     }
 }
@@ -834,18 +869,10 @@ func lighterColor(from nsColor: NSColor, amount: CGFloat = 0.14) -> Color {
 
 struct About: View {
     @State private var showBuildNumber: Bool = false
-    let updaterController: SPUStandardUpdaterController
-    @Environment(\.openWindow) var openWindow
     var body: some View {
         VStack {
             Form {
                 Section {
-                    HStack {
-                        Text("Release name")
-                        Spacer()
-                        Text(Defaults[.releaseName])
-                            .foregroundStyle(.secondary)
-                    }
                     HStack {
                         Text("Version")
                         Spacer()
@@ -864,32 +891,10 @@ struct About: View {
                 } header: {
                     Text("Version info")
                 }
-
-                UpdaterSettingsView(updater: updaterController.updater)
-
-                HStack(spacing: 30) {
-                    Spacer(minLength: 0)
-                    Button {
-                        if let url = URL(string: "https://github.com/TheBoredTeam/boring.notch") {
-                            NSWorkspace.shared.open(url)
-                        }
-                    } label: {
-                        VStack(spacing: 5) {
-                            Image("Github")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 18)
-                            Text("GitHub")
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    Spacer(minLength: 0)
-                }
-                .buttonStyle(PlainButtonStyle())
             }
             VStack(spacing: 0) {
                 Divider()
-                Text("Made with 🫶🏻 by not so boring not.people")
+                Text("Based on Boring Notch (GPL-3.0)")
                     .foregroundStyle(.secondary)
                     .padding(.top, 5)
                     .padding(.bottom, 7)
@@ -897,13 +902,6 @@ struct About: View {
                     .padding(.horizontal, 10)
             }
             .frame(maxWidth: .infinity, alignment: .center)
-        }
-        .toolbar {
-            //            Button("Welcome window") {
-            //                openWindow(id: "onboarding")
-            //            }
-            //            .controlSize(.extraLarge)
-            CheckForUpdatesView(updater: updaterController.updater)
         }
         .navigationTitle("About")
     }
@@ -1015,6 +1013,144 @@ struct Shelf: View {
         }
         .accentColor(.effectiveAccent)
         .navigationTitle("Shelf")
+    }
+}
+
+struct NotesSettings: View {
+    var body: some View {
+        Form {
+            Section {
+                Defaults.Toggle(key: .enableNotes) {
+                    Text("Enable notes")
+                }
+            } header: {
+                HStack {
+                    Text("General")
+                }
+            } footer: {
+                Text("Adds a Notes tab to the open notch with a single plain-text scratchpad that is saved automatically.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .accentColor(.effectiveAccent)
+        .navigationTitle("Notes")
+    }
+}
+
+struct TodosSettings: View {
+    var body: some View {
+        Form {
+            Section {
+                Defaults.Toggle(key: .enableTodos) {
+                    Text("Enable to-dos")
+                }
+            } header: {
+                HStack {
+                    Text("General")
+                }
+            } footer: {
+                Text("Adds a To-dos tab to the open notch with a simple checklist that is saved automatically.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .accentColor(.effectiveAccent)
+        .navigationTitle("To-dos")
+    }
+}
+
+struct TimerSettings: View {
+    @Default(.enableTimer) var enableTimer
+
+    var body: some View {
+        Form {
+            Section {
+                Defaults.Toggle(key: .enableTimer) {
+                    Text("Enable timer")
+                }
+            } header: {
+                HStack {
+                    Text("General")
+                }
+            } footer: {
+                Text("Adds a Timer tab to the open notch with a simple countdown and quick presets.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Section {
+                Defaults.Toggle(key: .timerLiveActivity) {
+                    Text("Show live activity in closed notch")
+                }
+                Defaults.Toggle(key: .timerPlaySound) {
+                    Text("Play sound when finished")
+                }
+            } header: {
+                HStack {
+                    Text("Behavior")
+                }
+            } footer: {
+                Text("While a countdown is active, the closed notch shows its progress and remaining time, taking priority over the music live activity.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .disabled(!enableTimer)
+        }
+        .accentColor(.effectiveAccent)
+        .navigationTitle("Timer")
+    }
+}
+
+struct BluetoothSettings: View {
+    @Default(.enableBluetooth) var enableBluetooth
+
+    var body: some View {
+        Form {
+            Section {
+                Defaults.Toggle(key: .enableBluetooth) {
+                    Text("Enable Bluetooth tab")
+                }
+            } header: {
+                HStack {
+                    Text("General")
+                }
+            } footer: {
+                Text("Adds a Bluetooth tab to the open notch listing your connected devices. Battery levels are shown only for devices that report them, such as AirPods and Magic accessories.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Section {
+                Defaults.Toggle(key: .bluetoothLiveActivity) {
+                    Text("Announce connections in closed notch")
+                }
+            } header: {
+                HStack {
+                    Text("Behavior")
+                }
+            } footer: {
+                Text("Briefly widens the closed notch when a Bluetooth device connects or disconnects.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .disabled(!enableBluetooth)
+
+            Section {
+                Button("Open Bluetooth Settings") {
+                    BluetoothManager.openBluetoothSettings()
+                }
+                Button("Open Bluetooth Privacy Settings") {
+                    BluetoothManager.openPrivacySettings()
+                }
+            } footer: {
+                Text("If no devices appear, make sure Deckmian is allowed to use Bluetooth in Privacy & Security.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .accentColor(.effectiveAccent)
+        .navigationTitle("Bluetooth")
     }
 }
 
@@ -1152,8 +1288,6 @@ struct Shelf: View {
 //        }
 //        .accentColor(.effectiveAccent)
 //        .navigationTitle("Extensions")
-//        // TipsView()
-//        // .padding(.horizontal, 19)
 //    }
 //}
 
@@ -1164,6 +1298,8 @@ struct Appearance: View {
     @Default(.useMusicVisualizer) var useMusicVisualizer
     @Default(.customVisualizers) var customVisualizers
     @Default(.selectedVisualizer) var selectedVisualizer
+    @Default(.glassMode) var glassMode
+    @Default(.glassModeTint) var glassModeTint
 
     let icons: [String] = ["logo2"]
     @State private var selectedIcon: String = "logo2"
@@ -1182,6 +1318,27 @@ struct Appearance: View {
 
             } header: {
                 Text("General")
+            }
+
+            Section {
+                Defaults.Toggle(key: .glassMode) {
+                    Text("Glass mode")
+                }
+                Slider(value: $glassModeTint, in: 0...0.8, step: 0.05) {
+                    HStack {
+                        Text("Glass tint")
+                        Spacer()
+                        Text("\(Int((glassModeTint * 100).rounded()))%")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .disabled(!glassMode)
+            } header: {
+                Text("Glass mode")
+            } footer: {
+                Text("Makes the open notch background translucent.")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
             }
 
             Section {
@@ -1743,6 +1900,136 @@ struct Shortcuts: View {
         }
         .accentColor(.effectiveAccent)
         .navigationTitle("Shortcuts")
+    }
+}
+
+struct SystemShortcutsSettings: View {
+    /// Sidebar value of this page; distinct from the keyboard "Shortcuts" page.
+    static let pageID = "SystemShortcuts"
+
+    @ObservedObject private var store = ShortcutsStore.shared
+    @Default(.enableShortcutsTab) var enableShortcutsTab
+
+    var body: some View {
+        Form {
+            Section {
+                Defaults.Toggle(key: .enableShortcutsTab) {
+                    Text("Enable shortcuts tab")
+                }
+            } header: {
+                HStack {
+                    Text("General")
+                }
+            } footer: {
+                Text("Adds a Shortcuts tab to the open notch to run your pinned shortcuts from the Shortcuts app with a click.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Section {
+                if store.pinned.isEmpty {
+                    Text("No shortcuts pinned yet. Select some below.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(store.pinned.enumerated()), id: \.element.id) { index, shortcut in
+                        pinnedRow(shortcut, index: index, count: store.pinned.count)
+                    }
+                }
+            } header: {
+                HStack {
+                    Text("Pinned")
+                }
+            } footer: {
+                Text("Pinned shortcuts appear in the notch in this order.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .disabled(!enableShortcutsTab)
+
+            Section {
+                if let error = store.errorMessage {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+
+                if store.available.isEmpty {
+                    Text(store.isLoading ? "Loading shortcuts…" : "No shortcuts found.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(store.available) { shortcut in
+                        Toggle(isOn: Binding(
+                            get: { store.isPinned(shortcut) },
+                            set: { store.setPinned($0, for: shortcut) }
+                        )) {
+                            Text(shortcut.name)
+                        }
+                        .toggleStyle(.checkbox)
+                    }
+                }
+            } header: {
+                HStack {
+                    Text("Available shortcuts")
+                    Spacer()
+                    if store.isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Button("Refresh") {
+                        store.refresh()
+                    }
+                    .disabled(store.isLoading)
+                }
+            }
+            .disabled(!enableShortcutsTab)
+
+            Section {
+                Button("Open Shortcuts app") {
+                    NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Shortcuts.app"))
+                }
+            } footer: {
+                Text("Create or edit shortcuts in the Shortcuts app, then refresh this list.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .accentColor(.effectiveAccent)
+        .navigationTitle("Shortcuts app")
+        .onAppear {
+            store.refresh()
+        }
+    }
+
+    private func pinnedRow(_ shortcut: ShortcutInfo, index: Int, count: Int) -> some View {
+        HStack {
+            Text(shortcut.name)
+                .lineLimit(1)
+            Spacer()
+            Button {
+                store.movePinned(shortcut, by: -1)
+            } label: {
+                Image(systemName: "chevron.up")
+            }
+            .buttonStyle(.borderless)
+            .disabled(index == 0)
+            .help("Move up")
+
+            Button {
+                store.movePinned(shortcut, by: 1)
+            } label: {
+                Image(systemName: "chevron.down")
+            }
+            .buttonStyle(.borderless)
+            .disabled(index == count - 1)
+            .help("Move down")
+
+            Button {
+                store.setPinned(false, for: shortcut)
+            } label: {
+                Image(systemName: "minus.circle")
+            }
+            .buttonStyle(.borderless)
+            .help("Unpin")
+        }
     }
 }
 

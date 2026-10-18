@@ -241,6 +241,59 @@ final class XPCHelperClient: NSObject {
             return false
         }
     }
+
+    // MARK: - Shortcuts
+
+    /// Lists the user's shortcuts as dictionaries keyed by `SystemShortcutKeys`, plus an error message when listing failed.
+    nonisolated func listShortcuts() async -> (items: [[String: String]], error: String?) {
+        do {
+            let service = await MainActor.run {
+                ensureRemoteService()
+            }
+            return try await service.withContinuation { service, continuation in
+                service.listShortcuts { items, error in
+                    continuation.resume(returning: (items, error))
+                }
+            }
+        } catch {
+            return ([], "Could not reach the helper: \(error.localizedDescription)")
+        }
+    }
+
+    /// Runs a shortcut by identifier (or name); returns whether it succeeded and, on failure, an error message.
+    nonisolated func runShortcut(_ identifierOrName: String) async -> (success: Bool, error: String?) {
+        do {
+            let service = await MainActor.run {
+                ensureRemoteService()
+            }
+            return try await service.withContinuation { service, continuation in
+                service.runShortcut(identifierOrName) { success, error in
+                    continuation.resume(returning: (success, error))
+                }
+            }
+        } catch {
+            return (false, "Could not reach the helper: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Bluetooth
+
+    /// Connected Bluetooth devices as reported by `system_profiler`, keyed by `BluetoothDeviceKeys`.
+    /// Returns an empty list when the helper is unreachable or the lookup fails.
+    nonisolated func bluetoothBatteryLevels() async -> [[String: String]] {
+        do {
+            let service = await MainActor.run {
+                ensureRemoteService()
+            }
+            return try await service.withContinuation { service, continuation in
+                service.bluetoothBatteryLevels { devices in
+                    continuation.resume(returning: devices)
+                }
+            }
+        } catch {
+            return []
+        }
+    }
 }
 
 extension Notification.Name {

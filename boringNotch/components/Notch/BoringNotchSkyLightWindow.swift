@@ -109,6 +109,7 @@ class BoringNotchSkyLightWindow: NSPanel {
     
     private var observers: Set<AnyCancellable> = []
     
-    override var canBecomeKey: Bool { false }
+    // Only accept keyboard focus while a text input tab (Notes, To-dos) is shown so it can receive typing
+    override var canBecomeKey: Bool { BoringViewCoordinator.shared.currentView.acceptsKeyboardInput }
     override var canBecomeMain: Bool { false }
 }
