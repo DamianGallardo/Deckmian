@@ -35,4 +35,6 @@ The full list is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Internal identifiers
 
-Bundle identifiers (`theboringteam.boringnotch`) and internal type and folder names (`boringNotch`, `BoringNotchXPCHelper`) still use the upstream names. Changing the bundle identifier would move the app to a new sandbox container and lose saved settings, notes and to-dos, so it is left as is on purpose.
+Folder, Xcode project, target and XPC helper product names are now Deckmian (`Deckmian/`, `DeckmianXPCHelper/`, `Deckmian.xcodeproj`, `DeckmianXPCHelper.xpc`).
+
+Bundle identifiers still use the upstream names (`theboringteam.boringnotch` and `theboringteam.boringnotch.BoringNotchXPCHelper`), as do the Application Support folder (`boringNotch/`) and some internal type names. Changing the bundle identifier would move the app to a new sandbox container and lose saved settings, notes and to-dos, and the XPC service is looked up by its bundle identifier, so these are left as is on purpose.

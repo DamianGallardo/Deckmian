@@ -10,7 +10,7 @@ Deckmian is a personal notch app for macOS. It turns the MacBook notch into an i
 2. Build:
 
    ```bash
-   xcodebuild -project boringNotch.xcodeproj -scheme boringNotch -configuration Debug \
+   xcodebuild -project Deckmian.xcodeproj -scheme Deckmian -configuration Debug \
      -destination 'platform=macOS' -derivedDataPath ../DerivedData \
      CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= build
    ```

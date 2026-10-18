@@ -20,6 +20,7 @@ All changes relative to the upstream base, Boring Notch commit `64b5459` (see [N
 ### Changed
 
 - App renamed to Deckmian in the product name and visible UI.
+- Source folders, Xcode project, targets and XPC helper product renamed to Deckmian (`Deckmian/`, `DeckmianXPCHelper/`, `Deckmian.xcodeproj`). Bundle identifiers are unchanged.
 - Tab bar and header buttons restyled; tabs shrink to fit beside the notch.
 - Notch cover in the header now stays centered over the hardware notch.
 - Shared keyboard-focus handling for text input in the notch.
